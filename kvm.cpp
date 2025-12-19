@@ -20,7 +20,7 @@ class VMManager {
         }
 
     public:
-        VMManager() : conn(nullptr);
+        VMManager() : conn(nullptr) {}
         ~VMManager() { if (conn) virConnectClose(conn); }
 
         bool connect(const std::string& uri) {
@@ -32,14 +32,112 @@ class VMManager {
             std::cout << "Connected to libvirt" << std::endl;
             return true;
         }
-        virDomainPtr createVM(const std::string& name, int memory, int vcpus);
-        void startVM(virDomainPtr vm);
-        void stopVM(virDomainPtr vm);
-        void destroyVM(virDomainPtr vm);
-        virDomainPtr lookupVM(const std::string& name);
-        void listVMs();
-        void getVMState(virDomainPtr vm);
-        void getVMInfo(virDomainPtr vm);
+
+        virDomainPtr createVM(const std::string& name, int memory, int vcpus) {
+            // Minimal VM XML configuration
+            std::string xml = 
+            "<domain type='kvm'>"
+            "  <name>" + name + "</name>"
+            "  <memory unit='MiB'>" + std::to_string(memory) + "</memory>"
+            "  <vcpu>" + std::to_string(vcpus) + "</vcpu>"
+            "  <os>"
+            "    <type arch='x86_64'>hvm</type>"
+            "    <boot dev='hd'/>"
+            "  </os>"
+            "  <features>"
+            "    <acpi/>"
+            "    <apic/>"
+            "  </features>"
+            "  <devices>"
+            "    <emulator>/usr/bin/qemu-system-x86_64</emulator>"
+            "    <disk type='file' device='disk'>"
+            "      <driver name='qemu' type='qcow2'/>"
+            "      <source file='/var/lib/libvirt/images/" + name + ".qcow2'/>"
+            "      <target dev='vda' bus='virtio'/>"
+            "    </disk>"
+            "    <interface type='network'>"
+            "      <source network='default'/>"
+            "      <model type='virtio'/>"
+            "    </interface>"
+            "    <console type='pty'/>"
+            "    <graphics type='vnc' port='-1'/>"
+            "  </devices>"
+            "</domain>";
+
+        virDomainPtr dom = virDomainDefineXML(conn, xml.c_str());
+        if (!dom) {
+            std::cerr << "Failed to define domain\n";
+            return nullptr;
+        }
+        
+        std::cout << "VM '" << name << "' defined successfully\n";
+        return dom;
+        }
+
+        bool startVM(virDomainPtr vm) {
+            if (virDomainCreate(vm) < 0) {
+                std::cerr << "Failed to start domain\n";
+                return false;
+            }
+            std::cout << "VM '" << name << "' started successfully\n";
+            return true;
+        }
+
+        // stop gracefully
+        bool stopVM(virDomainPtr vm) {
+            if (virDomainDestroy(vm) < 0) {
+                std::cerr << "Failed to stop domain\n";
+                return false;
+            }
+            std::cout << "VM '" << name << "' stopped successfully\n";
+            return true;
+        }
+
+        // destroy completely
+        bool destroyVM(virDomainPtr vm) {
+            if (virDomainDestroy(vm) < 0) {
+                std::cerr << "Failed to destroy VM\n";
+                return false;
+            }
+            std::cout << "VM '" << name << "' destroyed successfully\n";
+            return true;
+        }
+
+        virDomainPtr lookupVM(const std::string& name) {
+            virDomainPtr vm = virDomainLookupByName(conn, name.c_str());
+            if (!vm) {
+                std::cerr << "VM '" << name << "' not found\n";
+                return nullptr;
+            }
+            return vm;
+        }
+
+        void listVMs() {
+            virDomainPtr *domains;
+            int num = virConnectListAllDomains(conn, &domains, 0);
+            
+            if (num < 0) {
+                std::cerr << "Failed to list domains\n";
+                return;
+            }
+
+            std::cout << "Found " << num << " domains:\n";
+            for (int i = 0; i < num; i++) {
+                const char* name = virDomainGetName(domains[i]);
+                virDomainInfo info;
+                virDomainGetInfo(domains[i], &info);
+                
+                std::cout << "  - " << name 
+                        << " (State: " << getStateString(info.state) 
+                        << ", Memory: " << info.memory / 1024 << "MB)\n";
+                
+                virDomainFree(domains[i]);
+            }
+            free(domains);
+        }
+        void getVMState(virDomainPtr vm) {
+            std::cout << "VM '" << vm->name << "' state: " << getStateString(vm->state) << "\n";
+        }
 };
 
 int main() {
