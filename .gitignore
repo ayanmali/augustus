@@ -1,0 +1,35 @@
+# CMake build directories
+build/
+cmake-build-*/
+out/
+
+# CMake cache and generated files
+.cache/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+
+# Build artifacts
+*.o
+*.a
+*.so
+*.dylib
+*.exe
+
+# Executables
+augustus
+kvm_demo
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+Dockerfile
+docker-compose.yml
+compile_commands.json
