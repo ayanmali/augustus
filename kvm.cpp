@@ -1,7 +1,8 @@
 #include <iostream>
 #include <libvirt/libvirt.h>
 #include <string>
-#include <cstring>
+#include <cstdlib>
+#define MB_SIZE 1024
 
 // Can use different virtualization providers (QEMU, KVM, etc.)
 class VMManager {
@@ -29,14 +30,14 @@ class VMManager {
                 std::cerr << "Failed to connect to libvirt" << std::endl;
                 return false;
             }
-            std::cout << "Connected to libvirt" << std::endl;
+            std::cout << "Connected to libvirt\n";
             return true;
         }
 
-        virDomainPtr createVM(const std::string& name, int memory, int vcpus) {
+        virDomainPtr createVM(const std::string& name, const std::string& domain_type, int memory, int vcpus) {
             // Minimal VM XML configuration
             std::string xml = 
-            "<domain type='kvm'>"
+            "<domain type='" + domain_type + "'>"
             "  <name>" + name + "</name>"
             "  <memory unit='MiB'>" + std::to_string(memory) + "</memory>"
             "  <vcpu>" + std::to_string(vcpus) + "</vcpu>"
@@ -79,7 +80,7 @@ class VMManager {
                 std::cerr << "Failed to start domain\n";
                 return false;
             }
-            std::cout << "VM '" << name << "' started successfully\n";
+            std::cout << "VM started successfully\n";
             return true;
         }
 
@@ -89,7 +90,7 @@ class VMManager {
                 std::cerr << "Failed to stop domain\n";
                 return false;
             }
-            std::cout << "VM '" << name << "' stopped successfully\n";
+            std::cout << "VM '" << virDomainGetName(vm) << "' stopped successfully\n";
             return true;
         }
 
@@ -99,7 +100,7 @@ class VMManager {
                 std::cerr << "Failed to destroy VM\n";
                 return false;
             }
-            std::cout << "VM '" << name << "' destroyed successfully\n";
+            std::cout << "VM '" << virDomainGetName(vm) << "' destroyed successfully\n";
             return true;
         }
 
@@ -129,7 +130,7 @@ class VMManager {
                 
                 std::cout << "  - " << name 
                         << " (State: " << getStateString(info.state) 
-                        << ", Memory: " << info.memory / 1024 << "MB)\n";
+                        << ", Memory: " << info.memory / MB_SIZE << "MB)\n";
                 
                 virDomainFree(domains[i]);
             }
@@ -154,7 +155,7 @@ int main() {
 
     // Example: Create and start a VM
     std::string vmName = "test-vm";
-    virDomainPtr vm = manager.createVM(vmName, 1024, 2); // 1GB RAM, 2 vCPUs
+    virDomainPtr vm = manager.createVM(vmName, "kvm", 1024, 2); // 1GB RAM, 2 vCPUs
     
     if (vm) {
         // Note: You'd need to create the disk image first
