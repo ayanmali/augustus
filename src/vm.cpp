@@ -46,10 +46,11 @@ class VMManager {
         }
 
         /**
-         * @brief Finds the QEMU emulator binary path.
-         * 
-         * Searches common installation locations for qemu-system-x86_64.
-         * @return std::string Path to QEMU binary, or empty string if not found.
+         * @brief Locates the qemu-system-x86_64 emulator binary.
+         *
+         * Searches common installation locations and falls back to querying the system PATH.
+         *
+         * @return std::string Absolute path to the QEMU binary, or an empty string if not found.
          */
         std::string findQEMUPath() const {
             // Common QEMU paths
@@ -125,10 +126,12 @@ class VMManager {
         }
 
         /**
-         * @brief Defines a minimal KVM domain using the provided name, memory size, and vCPU count.
+         * @brief Defines and registers a minimal VM domain using the manager's domain type.
          *
-         * Creates and registers a domain definition (but does not start the domain). The provided
-         * name is used as the domain name and as the base filename for the VM disk image.
+         * The domain is defined (but not started) with the given name, memory (MiB), and vCPU count.
+         * The provided name is used as the domain name and as the base filename for the VM disk image;
+         * the disk path is chosen from the user's libvirt images directory when $HOME is set, otherwise
+         * a system images directory is used. The domain's emulator path is resolved at runtime.
          *
          * @param name Domain name and base filename for the VM's disk image.
          * @param memory Memory size in MiB.
@@ -212,10 +215,10 @@ class VMManager {
         }
 
         /**
-         * Stops the specified virtual machine.
+         * @brief Initiates a graceful shutdown of the specified virtual machine.
          *
-         * @param vm Libvirt domain handle representing the VM to stop.
-         * @return `true` if the VM was stopped successfully, `false` otherwise.
+         * @param vm Valid libvirt domain handle for the VM to shut down.
+         * @return `true` if the shutdown request was successfully initiated, `false` otherwise.
          */
         bool stopVM(virDomainPtr vm) {
             if (virDomainShutdown(vm) < 0) {
@@ -243,9 +246,9 @@ class VMManager {
         }
 
         /**
-         * @brief Undefines the given libvirt domain. The domain must be shut off to be undefined.
+         * @brief Undefines the specified libvirt domain; the domain must be shut off before calling.
          *
-         * @param vm Pointer to the libvirt domain to be undefined.
+         * @param vm Pointer to the libvirt domain to undefine.
          * @return bool `true` if the domain was undefined successfully, `false` otherwise.
          */
         bool undefineVM(virDomainPtr vm) {
@@ -276,13 +279,14 @@ class VMManager {
         }
 
         /**
-         * @brief Lists all libvirt domains known to the current connection and prints their basic info.
+         * @brief List all libvirt domains on the current connection and print their name, state, and memory.
          *
-         * Queries libvirt for all domains on the active connection and writes a summary to standard output:
-         * the total number of domains followed by each domain's name, human-readable state, and memory size in MB.
-         * If domain enumeration fails, an error message is written to standard error.
+         * Queries libvirt for all domains, prints the total count to standard output, then prints for each
+         * domain its name, a human-readable state string, and memory size in megabytes. If domain enumeration
+         * fails an error message is written to standard error.
          *
-         * This function releases each returned domain handle and the domains array before returning.
+         * Note: this function frees each returned domain handle. The domains array returned by libvirt is
+         * not explicitly freed in the current implementation.
          */
         void listVMs() {
             virDomainPtr *domains;

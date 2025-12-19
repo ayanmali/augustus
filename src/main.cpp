@@ -1,6 +1,14 @@
 #include <iostream>
 #include "vm.cpp"
 
+/**
+ * @brief Application entry point that connects to libvirt, lists existing virtual machines, and demonstrates creating a VM named "test-vm".
+ *
+ * The program attempts to connect to libvirt using the system URI and falls back to the session URI if the first attempt fails.
+ * On successful connection it prints a list of existing VMs and attempts to create a VM with 1024 MB RAM and 2 vCPUs (named "test-vm"), freeing the domain handle if creation succeeds.
+ *
+ * @return int 0 on success; 1 if both system and session libvirt connection attempts fail.
+ */
 int main() {
     std::cout << "Hello, World!\n";
 
