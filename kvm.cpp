@@ -1,7 +1,7 @@
 #include <iostream>
 #include <libvirt/libvirt.h>
 #include <string>
-#include <cstring>
+#include <cstdlib>
 
 // Can use different virtualization providers (QEMU, KVM, etc.)
 class VMManager {
