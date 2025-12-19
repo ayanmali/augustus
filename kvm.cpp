@@ -7,6 +7,16 @@
 class VMManager {
     private:
         virConnectPtr conn;
+        /**
+         * @brief Convert a libvirt domain state code to a human-readable string.
+         *
+         * Maps libvirt domain state constants (VIR_DOMAIN_*) to a short descriptive
+         * string suitable for display.
+         *
+         * @param state libvirt domain state code (one of the `VIR_DOMAIN_*` constants).
+         * @return std::string Human-readable state: `"Running"`, `"Blocked"`, `"Paused"`,
+         * `"Shutdown"`, `"Shutoff"`, `"Crashed"`, or `"Unknown"` if the state is unrecognized.
+         */
         std::string getStateString(unsigned char state) const {
             switch(state) {
                 case VIR_DOMAIN_RUNNING: return "Running";
@@ -20,9 +30,26 @@ class VMManager {
         }
 
     public:
-        VMManager() : conn(nullptr) {}
-        ~VMManager() { if (conn) virConnectClose(conn); }
+        /**
+ * @brief Constructs a VMManager and initializes the libvirt connection handle.
+ *
+ * Initializes the internal connection pointer to null so the manager starts
+ * without an active libvirt connection.
+ */
+VMManager() : conn(nullptr) {}
+        /**
+ * @brief Releases VMManager resources.
+ *
+ * Closes the libvirt connection held by this VMManager instance if one exists.
+ */
+~VMManager() { if (conn) virConnectClose(conn); }
 
+        /**
+         * @brief Establishes a connection to a libvirt daemon at the specified URI.
+         *
+         * @param uri Connection URI for libvirt (for example, "qemu:///system").
+         * @return true if the connection was opened successfully, false otherwise.
+         */
         bool connect(const std::string& uri) {
             conn = virConnectOpen(uri.c_str());
             if (!conn) {
@@ -33,6 +60,17 @@ class VMManager {
             return true;
         }
 
+        /**
+         * @brief Defines a minimal KVM domain using the provided name, memory size, and vCPU count.
+         *
+         * Creates and registers a domain definition (but does not start the domain). The provided
+         * name is used as the domain name and as the base filename for the VM disk image.
+         *
+         * @param name Domain name and base filename for the VM's disk image.
+         * @param memory Memory size in MiB.
+         * @param vcpus Number of virtual CPUs.
+         * @return virDomainPtr Pointer to the defined domain on success, `nullptr` on failure.
+         */
         virDomainPtr createVM(const std::string& name, int memory, int vcpus) {
             // Minimal VM XML configuration
             std::string xml = 
@@ -74,6 +112,12 @@ class VMManager {
         return dom;
         }
 
+        /**
+         * @brief Starts the given libvirt domain.
+         *
+         * @param vm Domain handle to start.
+         * @return true if the domain was started successfully, false otherwise.
+         */
         bool startVM(virDomainPtr vm) {
             if (virDomainCreate(vm) < 0) {
                 std::cerr << "Failed to start domain\n";
@@ -83,7 +127,12 @@ class VMManager {
             return true;
         }
 
-        // stop gracefully
+        /**
+         * Stops the specified virtual machine.
+         *
+         * @param vm Libvirt domain handle representing the VM to stop.
+         * @return `true` if the VM was stopped successfully, `false` otherwise.
+         */
         bool stopVM(virDomainPtr vm) {
             if (virDomainDestroy(vm) < 0) {
                 std::cerr << "Failed to stop domain\n";
@@ -93,7 +142,12 @@ class VMManager {
             return true;
         }
 
-        // destroy completely
+        /**
+         * @brief Permanently destroys the given libvirt domain.
+         *
+         * @param vm Pointer to the libvirt domain to be destroyed.
+         * @return bool `true` if the domain was destroyed successfully, `false` otherwise.
+         */
         bool destroyVM(virDomainPtr vm) {
             if (virDomainDestroy(vm) < 0) {
                 std::cerr << "Failed to destroy VM\n";
@@ -103,6 +157,14 @@ class VMManager {
             return true;
         }
 
+        /**
+         * @brief Finds a libvirt domain by its name.
+         *
+         * @param name Domain name to look up.
+         * @return virDomainPtr Pointer to the domain if found, `nullptr` otherwise.
+         *
+         * Caller is responsible for freeing the returned domain handle with `virDomainFree`.
+         */
         virDomainPtr lookupVM(const std::string& name) {
             virDomainPtr vm = virDomainLookupByName(conn, name.c_str());
             if (!vm) {
@@ -112,6 +174,15 @@ class VMManager {
             return vm;
         }
 
+        /**
+         * @brief Lists all libvirt domains known to the current connection and prints their basic info.
+         *
+         * Queries libvirt for all domains on the active connection and writes a summary to standard output:
+         * the total number of domains followed by each domain's name, human-readable state, and memory size in MB.
+         * If domain enumeration fails, an error message is written to standard error.
+         *
+         * This function releases each returned domain handle and the domains array before returning.
+         */
         void listVMs() {
             virDomainPtr *domains;
             int num = virConnectListAllDomains(conn, &domains, 0);
@@ -135,11 +206,25 @@ class VMManager {
             }
             free(domains);
         }
+        /**
+         * @brief Prints the domain's name and human-readable state to standard output.
+         *
+         * @param vm Pointer to a libvirt domain object whose name and state will be printed.
+         *           Must be non-null; behavior is undefined if `vm` is null.
+         */
         void getVMState(virDomainPtr vm) {
             std::cout << "VM '" << vm->name << "' state: " << getStateString(vm->state) << "\n";
         }
 };
 
+/**
+ * @brief Program entry demonstrating basic VMManager usage.
+ *
+ * Connects to libvirt, lists existing virtual machines, and attempts to define
+ * a sample VM named "test-vm" (the created domain is freed before exit).
+ *
+ * @return int 0 on success, 1 if connecting to libvirt failed.
+ */
 int main() {
     VMManager manager;
     
