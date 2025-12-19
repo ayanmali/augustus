@@ -61,33 +61,22 @@ if(PkgConfig_FOUND)
 endif()
 
 if(LIBVIRT_FOUND)
+    # Main executable (requires libvirt since main.cpp includes vm.cpp)
+    add_executable(augustus src/main.cpp)
+    target_include_directories(augustus PRIVATE ${LIBVIRT_INCLUDE_DIRS})
+    target_link_directories(augustus PRIVATE ${LIBVIRT_LIBRARY_DIRS})
+    target_link_libraries(augustus PRIVATE ${LIBVIRT_LIBRARIES})
+    target_compile_options(augustus PRIVATE ${LIBVIRT_CFLAGS_OTHER})
     message(STATUS "libvirt found")
     message(STATUS "  libvirt include dirs: ${LIBVIRT_INCLUDE_DIRS}")
     message(STATUS "  libvirt libraries: ${LIBVIRT_LIBRARIES}")
     
     # Add libvirt include path globally for IDE support
     include_directories(${LIBVIRT_INCLUDE_DIRS})
-    
-    # vm_manager executable
-    add_executable(vm_manager src/vm.cpp)
-    target_include_directories(vm_manager PRIVATE ${LIBVIRT_INCLUDE_DIRS})
-    target_link_directories(vm_manager PRIVATE ${LIBVIRT_LIBRARY_DIRS})
-    target_link_libraries(vm_manager PRIVATE ${LIBVIRT_LIBRARIES})
-    target_compile_options(vm_manager PRIVATE ${LIBVIRT_CFLAGS_OTHER})
 else()
-    message(WARNING "libvirt not found - augustus and vm_manager targets will fail")
+    message(WARNING "augustus target skipped - libvirt required")
+    message(WARNING "libvirt not found - augustus target will fail")
     message(STATUS "  Install libvirt: brew install libvirt")
-endif()
-
-# Main executable (requires libvirt since main.cpp includes vm.cpp)
-add_executable(augustus src/main.cpp)
-
-if(LIBVIRT_FOUND)
-    # Link augustus against libvirt since main.cpp uses VMManager from vm.cpp
-    target_include_directories(augustus PRIVATE ${LIBVIRT_INCLUDE_DIRS})
-    target_link_directories(augustus PRIVATE ${LIBVIRT_LIBRARY_DIRS})
-    target_link_libraries(augustus PRIVATE ${LIBVIRT_LIBRARIES})
-    target_compile_options(augustus PRIVATE ${LIBVIRT_CFLAGS_OTHER})
 endif()
 
 # Optional: gRPC support (if server.cpp is implemented)
@@ -107,7 +96,7 @@ endif()
 # Installation
 set(INSTALL_TARGETS augustus)
 if(LIBVIRT_FOUND)
-    list(APPEND INSTALL_TARGETS vm_manager)
+    list(APPEND INSTALL_TARGETS augustus)
 endif()
 install(TARGETS ${INSTALL_TARGETS}
     RUNTIME DESTINATION bin

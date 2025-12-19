@@ -1,5 +1,5 @@
 #include <iostream>
-#include "vm.cpp"
+#include "vm.h"
 
 int main() {
     std::cout << "Hello, World!\n";
@@ -35,9 +35,9 @@ int main() {
         
         // manager.startVM(vm);
         // ... do work ...
-        // manager.stopVM(vm);
-        
-        virDomainFree(vm);
+        manager.stopVM(vm);
+        manager.destroyVM(vm);
+        manager.undefineVM(vm);
     }
 
     return 0;

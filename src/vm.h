@@ -1,10 +1,16 @@
-#include <iostream>
+// header file for vm.cpp
+#ifndef VM_H
+#define VM_H
+
 #include <libvirt/libvirt.h>
+#include <iostream>
+#include <map>
 #include <string>
 #include <vector>
 #include <cstdlib>
 #include <sys/stat.h>
 #include <unistd.h>
+
 #define MB_SIZE 1024
 
 enum DomainType {
@@ -13,9 +19,9 @@ enum DomainType {
     // Add other domain types here
 };
 
-static const std::string domain_type_strings[] = {
-    "qemu",
-    "kvm",
+static const std::map<DomainType, std::string> domain_type_strings = {
+    {QEMU, "qemu"},
+    {KVM, "kvm"},
 };
 
 // Can use different virtualization providers (QEMU, KVM, etc.)
@@ -33,6 +39,22 @@ class VMManager {
          * @return std::string Human-readable state: `"Running"`, `"Blocked"`, `"Paused"`,
          * `"Shutdown"`, `"Shutoff"`, `"Crashed"`, or `"Unknown"` if the state is unrecognized.
          */
+        std::string escapeXML(const std::string& str) const {
+            std::string result;
+            result.reserve(str.size());
+            for (char c : str) {
+                switch (c) {
+                    case '<':  result += "&lt;";   break;
+                    case '>':  result += "&gt;";   break;
+                    case '&':  result += "&amp;";  break;
+                    case '\'': result += "&apos;"; break;
+                    case '"':  result += "&quot;"; break;
+                    default:   result += c;        break;
+                }
+            }
+            return result;
+        }
+
         std::string getStateString(unsigned char state) const {
             switch(state) {
                 case VIR_DOMAIN_RUNNING: return "Running";
@@ -151,6 +173,13 @@ class VMManager {
             if (home) {
                 // macOS: use user's libvirt directory
                 disk_path = std::string(home) + "/.local/share/libvirt/images/" + name + ".qcow2";
+                // Check if directory exists
+                std::string dir = std::string(home) + "/.local/share/libvirt/images";
+                struct stat st;
+                if (stat(dir.c_str(), &st) != 0) {
+                    std::cerr << "Warning: Directory does not exist: " << dir << std::endl;
+                    std::cerr << "You may need to create it: mkdir -p " << dir << std::endl;
+                }
             } else {
                 // Fallback to Linux standard path
                 disk_path = "/var/lib/libvirt/images/" + name + ".qcow2";
@@ -158,8 +187,8 @@ class VMManager {
             
             // Minimal VM XML configuration
             std::string xml = 
-            "<domain type='" + domain_type_strings[domain_type] + "'>"
-            "  <name>" + name + "</name>"
+            "<domain type='" + domain_type_strings.at(domain_type) + "'>"
+            "  <name>" + escapeXML(name) + "</name>"
             "  <memory unit='MiB'>" + std::to_string(memory) + "</memory>"
             "  <vcpu>" + std::to_string(vcpus) + "</vcpu>"
             "  <os>"
@@ -171,10 +200,10 @@ class VMManager {
             "    <apic/>"
             "  </features>"
             "  <devices>"
-            "    <emulator>" + qemu_path + "</emulator>"
+            "    <emulator>" + escapeXML(qemu_path) + "</emulator>"
             "    <disk type='file' device='disk'>"
             "      <driver name='qemu' type='qcow2'/>"
-            "      <source file='" + disk_path + "'/>"
+            "      <source file='" + escapeXML(disk_path) + "'/>"
             "      <target dev='vda' bus='virtio'/>"
             "    </disk>"
             "    <interface type='network'>"
@@ -233,12 +262,12 @@ class VMManager {
          * @return bool `true` if the domain was destroyed successfully, `false` otherwise.
          */
         bool destroyVM(virDomainPtr vm) {
+            std::string name = virDomainGetName(vm);
             if (virDomainDestroy(vm) < 0) {
-                std::cerr << "Failed to destroy VM\n";
+                std::cerr << "Failed to destroy VM '" << name << "'\n";
                 return false;
             }
-            virDomainFree(vm);
-            std::cout << "VM '" << virDomainGetName(vm) << "' destroyed successfully\n";
+            std::cout << "VM '" << name << "' destroyed successfully\n";
             return true;
         }
 
@@ -249,11 +278,12 @@ class VMManager {
          * @return bool `true` if the domain was undefined successfully, `false` otherwise.
          */
         bool undefineVM(virDomainPtr vm) {
+            std::string name = virDomainGetName(vm);
             if (virDomainUndefine(vm) < 0) {
-                std::cerr << "Failed to undefine VM\n";
+                std::cerr << "Failed to undefine VM '" << name << "'\n";
                 return false;
             }
-            std::cout << "VM '" << virDomainGetName(vm) << "' undefined successfully\n";
+            std::cout << "VM '" << name << "' undefined successfully\n";
             return true;
         }
 
@@ -305,7 +335,7 @@ class VMManager {
                 
                 virDomainFree(domains[i]);
             }
-            //free(domains);
+            free(domains);
         }
         /**
          * @brief Prints the domain's name and human-readable state to standard output.
@@ -324,41 +354,4 @@ class VMManager {
         }
 };
 
-/**
- * @brief Program entry demonstrating basic VMManager usage.
- *
- * Connects to libvirt, lists existing virtual machines, and attempts to define
- * a sample VM named "test-vm" (the created domain is freed before exit).
- *
- * @return int 0 on success, 1 if connecting to libvirt failed.
- */
-// int main() {
-//     VMManager manager(QEMU);
-    
-//     // Connect to QEMU/KVM
-//     if (!manager.connect("qemu:///system")) {
-//         std::cerr << "Failed to connect to libvirt\n";
-//         return 1;
-//     }
-
-//     // List existing VMs
-//     std::cout << "\n=== Existing VMs ===\n";
-//     manager.listVMs();
-
-//     // Example: Create and start a VM
-//     std::string vmName = "test-vm";
-//     virDomainPtr vm = manager.createVM(vmName, "qemu", 1024, 2); // 1GB RAM, 2 vCPUs
-    
-//     if (vm) {
-//         // Note: You'd need to create the disk image first
-//         // qemu-img create -f qcow2 /var/lib/libvirt/images/test-vm.qcow2 10G
-        
-//         // manager.startVM(vm);
-//         // ... do work ...
-//         // manager.stopVM(vm);
-        
-//         virDomainFree(vm);
-//     }
-
-//     return 0;
-// }
+#endif // VM_H      

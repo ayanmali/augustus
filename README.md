@@ -1,10 +1,10 @@
 # Augustus - KVM VM Manager
 
-A C++ library and examples for managing lightweight VMs using KVM (Kernel-based Virtual Machine).
+A C++ library and examples for managing lightweight VMs using built-in hypervisors (QEMU, KVM).
 
 ## Overview
 
-This project provides a C++ interface for creating and managing lightweight virtual machines using the KVM API. KVM is a Linux kernel module that provides hardware-assisted virtualization.
+This project provides a C++ interface for creating and managing lightweight virtual machines using the libvirt library. QEMU and KVM are OS modules that provide hardware-assisted virtualization.
 
 ## Features
 
